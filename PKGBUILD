@@ -1,5 +1,5 @@
 pkgname=pcmanfm
-pkgver=r6.a86ba76
+pkgver=1.3.2
 pkgrel=1
 pkgdesc="Extremely fast and lightweight file manager"
 arch=(x86_64)
@@ -15,13 +15,13 @@ conflicts=($pkgname)
 source=($pkgname::git+${url}.git)
 sha256sums=(SKIP)
 
-pkgver() {
-  printf "r%s.%s" "$(git ls-remote ${upstream}.git | wc -l)" "$(git ls-remote ${upstream}.git | grep -m1 HEAD | cut -c1-7)"
-}
-
+# pkgver() {
+#   printf "r%s.%s" "$(git ls-remote ${upstream}.git | wc -l)" "$(git ls-remote ${upstream}.git | grep -m1 HEAD | cut -c1-7)"
+# }
+ 
 prepare() {
   mkdir -p upstream
-  curl -L $upstream/archive/refs/tags/1.3.2.tar.gz | tar xvfz - --strip-components=1 -C upstream
+  curl -L $upstream/archive/refs/tags/$pkgver.tar.gz | tar xvfz - --strip-components=1 -C upstream
   cp $pkgname/patch upstream/
   cd upstream
   git apply patch
