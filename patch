@@ -1,0 +1,126 @@
+Description: Make menubar visibility optional
+ Introduces a new toggle for hiding the menubar in the 'View' menu
+ as well as via Ctrl+M.
+ pcmanfm (1.3.1-1)
+
+--- a/src/app-config.c
++++ b/src/app-config.c
+@@ -527,6 +527,7 @@ static void fm_app_config_init(FmAppConf
+     cfg->autorun_choices = g_hash_table_new_full(g_str_hash, g_str_equal,
+                                                  g_free, _free_archoice);
+     cfg->show_statusbar = TRUE;
++    cfg->show_menubar = TRUE;
+ #if FM_CHECK_VERSION(1, 2, 0)
+     cfg->home_path = NULL;
+     cfg->focus_previous = FALSE;
+@@ -770,6 +771,7 @@ void fm_app_config_load_from_key_file(Fm
+         }
+         g_strfreev(tmpv);
+     }
++    fm_key_file_get_bool(kf, "ui", "show_menubar", &cfg->show_menubar);
+     fm_key_file_get_bool(kf, "ui", "show_statusbar", &cfg->show_statusbar);
+     if (g_key_file_has_group(kf, "autorun"))
+     {
+@@ -1170,6 +1172,7 @@ void fm_app_config_save_profile(FmAppCon
+         if (cfg->tb.home)
+             g_string_append(buf, "home;");
+         g_string_append_c(buf, '\n');
++        g_string_append_printf(buf, "show_menubar=%d\n", cfg->show_menubar);
+         g_string_append_printf(buf, "show_statusbar=%d\n", cfg->show_statusbar);
+         g_string_append_printf(buf, "pathbar_mode_buttons=%d\n", cfg->pathbar_mode_buttons);
+ 
+--- a/src/app-config.h
++++ b/src/app-config.h
+@@ -144,6 +144,7 @@ struct _FmAppConfig
+     GtkSortType sort_type;
+     int sort_by;
+ #endif
++    gboolean show_menubar;
+     gboolean show_statusbar;
+ #if FM_CHECK_VERSION(1, 2, 0)
+     char *home_path;
+--- a/src/main-win-ui.c
++++ b/src/main-win-ui.c
+@@ -119,6 +119,7 @@ static const char main_menu_xml[] =
+       "<menuitem action='DirTree' />"
+ #endif
+     "</menu>"
++    "<menuitem action='ShowMenuBar'/>"
+     "<menuitem action='ShowStatus'/>"
+     "<separator/>"
+     "<menuitem action='DualPane'/>"
+@@ -284,6 +285,7 @@ static GtkToggleActionEntry main_win_tog
+     {"ToolbarNav", NULL, N_("Show _Navigation Buttons"), NULL, NULL, G_CALLBACK(on_toolbar_nav), TRUE},
+     {"ToolbarHome", NULL, N_("Show '_Home' Button"), NULL, NULL, G_CALLBACK(on_toolbar_home), TRUE},
+     {"ShowSidePane", NULL, N_("Sho_w Side Pane"), "F9", NULL, G_CALLBACK(on_show_side_pane), TRUE},
++    {"ShowMenuBar", NULL, N_("Show Menu _Bar"), "<Ctrl>M", NULL, G_CALLBACK(on_show_menubar), TRUE},
+     {"ShowStatus", NULL, N_("Show Status B_ar"), "<Ctrl>B", NULL, G_CALLBACK(on_show_status), TRUE},
+     {"DualPane", NULL, N_("_Dual Pane Mode"), "F3", N_("Show two panels with folder views"), G_CALLBACK(on_dual_pane), FALSE},
+     {"Fullscreen", NULL, N_("Fullscreen _Mode"), "F11", NULL, G_CALLBACK(on_fullscreen), FALSE}
+--- a/src/main-win.c
++++ b/src/main-win.c
+@@ -107,6 +107,7 @@ static void on_toolbar_new_win(GtkToggle
+ static void on_toolbar_new_tab(GtkToggleAction *act, FmMainWin *win);
+ static void on_toolbar_nav(GtkToggleAction *act, FmMainWin *win);
+ static void on_toolbar_home(GtkToggleAction *act, FmMainWin *win);
++static void on_show_menubar(GtkToggleAction *action, FmMainWin *win);
+ static void on_show_status(GtkToggleAction *action, FmMainWin *win);
+ static void on_change_mode(GtkRadioAction* act, GtkRadioAction *cur, FmMainWin* win);
+ static void on_sort_by(GtkRadioAction* act, GtkRadioAction *cur, FmMainWin* win);
+@@ -913,7 +914,7 @@ static void fm_main_win_init(FmMainWin *
+     }
+ #endif
+ 
+-    menubar = gtk_ui_manager_get_widget(ui, "/menubar");
++    win->menubar = GTK_TOOLBAR(gtk_ui_manager_get_widget(ui, "/menubar"));
+     win->toolbar = GTK_TOOLBAR(gtk_ui_manager_get_widget(ui, "/toolbar"));
+     /* FIXME: should make these optional */
+     gtk_toolbar_set_icon_size(win->toolbar, GTK_ICON_SIZE_SMALL_TOOLBAR);
+@@ -946,7 +947,7 @@ static void fm_main_win_init(FmMainWin *
+     if (atk_obj)
+         atk_object_set_name(atk_obj, _("History"));
+ 
+-    gtk_box_pack_start( vbox, menubar, FALSE, TRUE, 0 );
++    gtk_box_pack_start( vbox, GTK_WIDGET(win->menubar), FALSE, TRUE, 0 );
+     gtk_box_pack_start( vbox, GTK_WIDGET(win->toolbar), FALSE, TRUE, 0 );
+ 
+     /* load bookmarks menu */
+@@ -1720,6 +1721,10 @@ FmMainWin* fm_main_win_add_win(FmMainWin
+     act = gtk_ui_manager_get_action(win->ui, "/menubar/ViewMenu/ShowStatus");
+     gtk_toggle_action_set_active(GTK_TOGGLE_ACTION(act), app_config->show_statusbar);
+     gtk_widget_set_visible(GTK_WIDGET(win->statusbar), app_config->show_statusbar);
++    /* the same for menu bar */
++    act = gtk_ui_manager_get_action(win->ui, "/menubar/ViewMenu/ShowMenuBar");
++    gtk_toggle_action_set_active(GTK_TOGGLE_ACTION(act), app_config->show_menubar);
++    gtk_widget_set_visible(GTK_WIDGET(win->menubar), app_config->show_menubar);
+     /* the same for path bar mode */
+     gtk_widget_hide(GTK_WIDGET(win->path_bar));
+     act = gtk_ui_manager_get_action(win->ui, "/menubar/ViewMenu/PathMode/PathEntry");
+@@ -2689,3 +2694,17 @@ static void on_show_status(GtkToggleActi
+         pcmanfm_save_config(FALSE);
+     }
+ }
++
++static void on_show_menubar(GtkToggleAction *action, FmMainWin *win)
++{
++    gboolean active;
++
++    active = gtk_toggle_action_get_active(action);
++    if (active != app_config->show_menubar)
++    {
++        app_config->show_menubar = active;
++        fm_config_emit_changed(fm_config, "menubar");
++        gtk_widget_set_visible(GTK_WIDGET(win->menubar), active);
++        pcmanfm_save_config(FALSE);
++    }
++}
+--- a/src/main-win.h
++++ b/src/main-win.h
+@@ -51,6 +51,7 @@ struct _FmMainWin
+     GtkRadioAction* first_view_mode;
+     GtkRadioAction* first_side_pane_mode;
+     GtkToolbar* toolbar;
++    GtkToolbar* menubar;
+     FmPathEntry* location;
+     FmPathBar* path_bar;
+     GtkNotebook* notebook;
