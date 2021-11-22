@@ -24,7 +24,6 @@ jobs:
 
       - name: Run a multi-line script
         run: |
-          apt update && apt install -y jq curl
           curl -Ls https://api.github.com/repos/lxde/pcmanfm/tags |
           jq -r '.[].name' |
           grep -E "[0-9]+\.[0-9]+\.[0-9]+(\-\w+)?" |
