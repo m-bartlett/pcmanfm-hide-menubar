@@ -1,0 +1,32 @@
+# This is a basic workflow to help you get started with Actions
+
+name: CI
+
+# Controls when the workflow will run
+on:
+  schedule:
+    - cron:  '0 0 * * *'
+
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  check_upstream_release:
+    name: check for new release of upstream package so we can make an automatic downstream release
+    
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Run a multi-line script
+        run: |
+          apt update && apt install -y jq curl
+          curl -Ls https://api.github.com/repos/lxde/pcmanfm/tags |
+          jq -r '.[].name' |
+          grep -E "[0-9]+\.[0-9]+\.[0-9]+(\-\w+)?" |
+          sort -t. -k 1,1n -k 2,2n -k 3,3n -k 4,4n |
+          tail -1
